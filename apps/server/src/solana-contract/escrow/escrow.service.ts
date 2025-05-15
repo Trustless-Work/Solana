@@ -18,6 +18,7 @@ import type {
 import { mapErrorCodeToMessage } from 'src/utils/errors.utils'
 import { adjustPricesToMicroUSDC } from 'src/utils/parse.utils'
 import { buildTransaction } from 'src/utils/transaction.utils'
+import { AnchorService } from '../anchor/anchor.service'
 import type { HelperService } from '../helper/helper.service'
 import type { PendingWriteQueueService } from '../queue/pending-write-queue.service'
 import type { EscrowDto } from './Dto/escrow.dto'
@@ -44,6 +45,7 @@ export class EscrowService {
 		private pendingWriteQueue: PendingWriteQueueService,
 		private readonly escrowFirestoreService: EscrowFirestoreService,
 		private readonly helperService: HelperService,
+		private readonly anchorService: AnchorService,
 	) {
 		this.horizonServer = new StellarSDK.Horizon.Server(
 			`${process.env.SERVER_URL}`,

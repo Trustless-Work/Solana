@@ -1,5 +1,5 @@
 import * as anchor from '@coral-xyz/anchor'
-import { EscrowIDL, type Escrow } from '@programs/solana-tl'
+import { type Escrow, EscrowIDL } from '@programs/solana-tl'
 import { Keypair } from '@solana/web3.js'
 import { assert } from 'chai'
 

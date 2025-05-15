@@ -1,14 +1,19 @@
+import * as anchor from '@coral-xyz/anchor'
+import { Program } from '@coral-xyz/anchor'
 import * as borsh from '@project-serum/borsh'
 import { PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
 import { Structure } from 'buffer-layout.types'
 import { ESCROW_ACCOUNT_STATE_SCHEMA } from 'src/config/constants/escrow-borsh-struct.constant'
 import {
+	Escrow,
 	EscrowStructure,
+	EscrowSwapData,
 	SmartContractEscrowStructure,
 } from 'src/interfaces/escrow.interface'
 import { EscrowCamelCaseResponse } from 'src/interfaces/response.interface'
 import type { EscrowDto } from '../solana-contract/escrow/Dto/escrow.dto'
+import { bnToString } from './anchor.utils'
 
 // Define the Borsh schema for the Milestone struct
 const milestoneSchema = borsh.struct([
@@ -148,6 +153,121 @@ export function deserializeEscrow(buffer: Buffer) {
 	}
 
 	return escrow
+}
+
+/**
+ * Interface for Anchor-compatible account data
+ */
+export interface AnchorEscrowAccount {
+	engagementId?: string
+	title?: string
+	description?: string
+	amount?: anchor.BN
+	approver?: PublicKey
+	serviceProvider?: PublicKey
+	platformAddress?: PublicKey
+	platformFee?: anchor.BN
+	releaseSigner?: PublicKey
+	disputeResolver?: PublicKey
+	trustline?: PublicKey
+	receiver?: PublicKey
+	trustlineDecimals?: anchor.BN
+	receiverMemo?: anchor.BN
+	disputeFlag?: boolean
+	releaseFlag?: boolean
+	resolvedFlag?: boolean
+	milestones?: Array<{
+		approvedFlag?: boolean
+		description?: string
+		evidence?: string
+		status?: string
+	}>
+	swapData?: {
+		originalAmount?: anchor.BN
+		originalCurrency?: string
+		tokenAmount?: anchor.BN
+		tokenCurrency?: string
+		conversionTxHash?: string
+		conversionRate?: anchor.BN
+		conversionTimestamp?: anchor.BN
+	}
+}
+
+/**
+ * Convert Anchor account to standard response format
+ * @param anchorAccount The account fetched with Anchor
+ * @returns Standardized response object
+ */
+export function convertAnchorEscrowToResponse(
+	anchorAccount: AnchorEscrowAccount,
+): Escrow {
+	// Create escrow object
+	const escrow: Escrow = {
+		engagementId: anchorAccount.engagementId || '',
+		title: anchorAccount.title || '',
+		description: anchorAccount.description || '',
+		amount: Number(bnToString(anchorAccount.amount)),
+		approver: anchorAccount.approver?.toString() || '',
+		serviceProvider: anchorAccount.serviceProvider?.toString() || '',
+		platformAddress: anchorAccount.platformAddress?.toString() || '',
+		platformFee: Number(bnToString(anchorAccount.platformFee)),
+		releaseSigner: anchorAccount.releaseSigner?.toString() || '',
+		disputeResolver: anchorAccount.disputeResolver?.toString() || '',
+		trustline: anchorAccount.trustline?.toString() || '',
+		receiver: anchorAccount.receiver?.toString() || '',
+		trustlineDecimals: Number(bnToString(anchorAccount.trustlineDecimals)),
+		receiverMemo: Number(bnToString(anchorAccount.receiverMemo)),
+		disputeFlag: !!anchorAccount.disputeFlag,
+		releaseFlag: !!anchorAccount.releaseFlag,
+		resolvedFlag: !!anchorAccount.resolvedFlag || false,
+		milestones:
+			anchorAccount.milestones?.map((milestone) => ({
+				approved_flag: !!milestone.approvedFlag,
+				description: milestone.description || '',
+				evidence: milestone.evidence || '',
+				status: milestone.status || '',
+			})) || [],
+	}
+
+	// Add swap data if available
+	if (anchorAccount.swapData) {
+		escrow.swapData = {
+			originalAmount: bnToString(anchorAccount.swapData.originalAmount),
+			originalCurrency: anchorAccount.swapData.originalCurrency || '',
+			tokenAmount: bnToString(anchorAccount.swapData.tokenAmount),
+			tokenCurrency: anchorAccount.swapData.tokenCurrency || '',
+			conversionTxHash: anchorAccount.swapData.conversionTxHash || '',
+			conversionRate: bnToString(anchorAccount.swapData.conversionRate),
+			conversionTimestamp: Number(
+				bnToString(anchorAccount.swapData.conversionTimestamp),
+			),
+		}
+	}
+
+	return escrow
+}
+
+/**
+ * Fetch and deserialize an escrow account using Anchor
+ * @param program Anchor Program instance
+ * @param accountAddress Public key of the escrow account
+ * @returns Deserialized escrow account
+ */
+export async function fetchAnchorEscrowAccount(
+	program: Program,
+	accountAddress: PublicKey,
+): Promise<Escrow> {
+	try {
+		// Fetch the account using Anchor's typed account fetcher
+		const escrowAccount = (await program.account.escrowAccount.fetch(
+			accountAddress,
+		)) as AnchorEscrowAccount
+		return convertAnchorEscrowToResponse(escrowAccount)
+	} catch (error) {
+		console.error('Error fetching escrow with Anchor:', error)
+		// Fall back to manual deserialization
+		throw error
+	}
 }
 
 export function adjustPricesToMicroUSDC({
